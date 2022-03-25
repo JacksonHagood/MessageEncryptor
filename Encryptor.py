@@ -1,3 +1,6 @@
+from soundplayer import SoundPlayer
+import time
+
 # affine cipher keys
 key1 = 7
 key2 = 193
@@ -19,8 +22,13 @@ binary += "11000001"
 
 print("Encrypted message: " + binary)
 
-# for char in binary:
-#     if char == '0':
-#         print("low")
-#     else:
-#         print("high")
+dev = 2 # set using aplay -l
+
+for char in binary:
+    if char == '0':
+        SoundPlayer.playTone(500, 0.9, True, dev)
+        print("low")
+    else:
+        SoundPlayer.playTone(1000, 0.9, True, dev)
+        print("high")
+    time.sleep(0.1)
