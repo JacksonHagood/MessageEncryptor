@@ -3,8 +3,8 @@ import numpy as np
 
 
 samplerate = 44100
-FREQ0 = 5000
-FREQ1 = 10000
+FREQ0 = 1000
+FREQ1 = 2000
 array = np.array([])
 t = np.linspace(0., (1/12), int(samplerate/12))
 amplitude = np.iinfo(np.int16).max
@@ -23,6 +23,7 @@ c = []
 binary = ""
 
 for char in m:
+    #print(bin(ord(char)))
     # encrypt each character with encryption formula
     c.append((key1 * ord(char) + key2) % 256)
 
@@ -47,7 +48,8 @@ for i in range(0, len(binary), 1):
         temp = np.full((1, FREQ0), amplitude)
         array = np.append(array, high)
         
-
+array = np.append(space, array)
+array = np.append(array, space)
 
 wavfile.write("example.wav", samplerate, array.astype(np.int16))
 
