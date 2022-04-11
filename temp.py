@@ -24,8 +24,7 @@ def freq(file, start_time, end_time):
     freq = xf[idx]
     return freq
 
-stop, data = wavfile.read(file)
-# stop = 8000
+stop = 8000
 steps = 500
 
 frequencies = []
@@ -33,15 +32,45 @@ frequencies = []
 for i in range(steps):
     # print(stop * ((i + 0.0) / 100.0), stop * ((i + 1.0) / 100.0))
     frequencies.append(freq("input.wav", stop * ((i + 0.0) / steps), stop * ((i + 1.0) / steps)))
-    
+
     # print(freq("input.wav", stop * ((i + 0.0) / steps), stop * ((i + 1.0) / steps)))
 
 skip = 0
 
+temp = ""
+
 for f in frequencies:
-    if skip > 0:
-        continue
     if f < 2500 and f > 1500:
-        print("1", end="")
+        temp += "1"
+        # print("1", end="")
     elif f < 1500 and f > 500:
-        print("0", end="")
+        temp += "0"
+        # print("0", end="")
+
+# print(temp, "\n")
+
+# binary = ""
+# skip = 0
+# current = "0"
+
+# for char in temp:
+#     if skip > 0:
+#         if char != current:
+#             skip = 0
+#         else:
+#             skip -= 1
+#     elif char == "0":
+#         binary += "0"
+#         current = "0"
+#         skip = 4
+#     else:
+#         binary += "1"
+#         current = "1"
+#         skip = 4
+
+# print(binary, "\n")
+
+# for i in range(len(binary)):
+#     if binary[i:i + 8] == "11000001":
+
+
