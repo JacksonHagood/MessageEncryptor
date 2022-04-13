@@ -24,13 +24,10 @@ def get_hamming(data, d_bits, p_bits):
 
             if int(i % 2) == 1:
                 parity_bits[1] += data_bit
-                #print(i, 1)
             if int((i % 4) / 2) == 1:
                 parity_bits[2] += data_bit
-                #print(i, 2)
             if int((i % 8) / 4) == 1:
                 parity_bits[3] += data_bit
-                #print(i, 3)
             if int((i % 16) / 8) == 1:
                 parity_bits[4] += data_bit
                 #print(i, 4)
@@ -104,4 +101,4 @@ for i in range(0, len(binary_arr), 1):
 array = np.append(space, array)
 array = np.append(array, space)
 
-wavfile.write("output.wav", samplerate, array.astype(np.int16))
+wavfile.write("hamming.wav", samplerate, array.astype(np.int16))
