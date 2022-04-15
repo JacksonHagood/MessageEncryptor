@@ -1,5 +1,6 @@
 from scipy.io import wavfile
 import numpy as np
+import os
 
 def get_hamming(data, d_bits, p_bits):
     print(len(data))
@@ -104,4 +105,9 @@ for i in range(0, len(binary_arr), 1):
 array = np.append(space, array)
 array = np.append(array, space)
 
-wavfile.write("output.wav", samplerate, array.astype(np.int16))
+wavfile.write("encrypted.wav", samplerate, array.astype(np.int16))
+
+wav_file = "./encrypted.wav"
+os.system(f'aplay {wav_file}')
+
+
