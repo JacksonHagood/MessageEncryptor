@@ -107,6 +107,8 @@ array = np.append(array, space)
 
 wavfile.write("encrypted.wav", samplerate, array.astype(np.int16))
 
+input("Press <Enter> to play message")
+
 wav_file = "./encrypted.wav"
 os.system(f'aplay {wav_file}')
 
