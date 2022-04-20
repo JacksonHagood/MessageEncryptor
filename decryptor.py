@@ -1,7 +1,7 @@
+# imports
 from pickle import NONE
 from scipy.io import wavfile
 import numpy as np
-# import matplotlib.pyplot as plt
 import pyaudio
 import scipy.fft as fft
 from scipy.signal import find_peaks
@@ -12,184 +12,155 @@ import wave
 import signal
 import os
 
-cont = True
+cont = True # boolean for signal handling
 
+# signal handler for stopping recording
 def sigint_handler(signal, frame):
         print("Stopping...")
         global cont
         cont = False
 
-signal.signal(signal.SIGINT, sigint_handler)
+signal.signal(signal.SIGINT, sigint_handler) # signal setup
 
+# wav file variables
+chunk = 1000
+rate = 44100
+channels = 1
+wav_file = "input.wav"
+form = pyaudio.paInt16
+frames = []
 
-# write to wave file
-CHUNK = 1000
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-RECORD_SECONDS = 25
-WAVE_OUTPUT_FILENAME = "input.wav"
-
+# setup audio listener
 p = pyaudio.PyAudio()
+stream = p.open(format = form, channels = channels, rate = rate, input = True, frames_per_buffer = chunk)
 
-stream = p.open(format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                input=True,
-                frames_per_buffer=CHUNK)
+# wait for keystroke
 input("Press <Enter> to start recording...")
 print("* recording")
 
-frames = []
-
+# read sound signal
 while cont:
-    data = stream.read(CHUNK)
+    data = stream.read(chunk)
     frames.append(data)
 
+# stop recording
 print("* done recording")
 
+# close reader
 stream.stop_stream()
 stream.close()
 p.terminate()
 
-wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
-wf.setnchannels(CHANNELS)
-wf.setsampwidth(p.get_sample_size(FORMAT))
-wf.setframerate(RATE)
+# write to wav file
+wf = wave.open(wav_file, 'wb')
+wf.setnchannels(channels)
+wf.setsampwidth(p.get_sample_size(form))
+wf.setframerate(rate)
 wf.writeframes(b''.join(frames))
 wf.close()
 
+# reading wav file variables
 REL_FREQ = 4
-
-FREQ0 = 1000
-FREQ1 = 2000
-
+FREQ0 = 1000 # tone 0
+FREQ1 = 2000 # tone 1
 NULL_BYTE = "11000001"
 
+# open wav file
 freq_sample, sig_audio = wavfile.read("./input.wav")
 
 if sig_audio.ndim > 1:
         sig_audio = sig_audio[:, 0]
 
-duration = int(freq_sample/(REL_FREQ*12))
-#print("Duration:", duration)
-# List to store binary value over window (needs to be cleaned before message can be decoded)
+# get duration
+duration = int(freq_sample / (REL_FREQ * 12))
+
+# list to store binary value over window
 dirty_bin = []
-x=0
-for i in range(0,len(sig_audio),duration):
-    yf = fft.rfft(sig_audio[i:i+duration])
+x = 0
+
+# iterate through signal
+for i in range(0, len(sig_audio), duration):
+    # get y and x
+    yf = fft.rfft(sig_audio[i : i + duration])
     xf = fft.rfftfreq(duration, 1 / freq_sample)
 
-
-
-    """plt.plot(xf, yf)
-    plt.savefig(f"plot{x}")
-    plt.margins(x=0, y=-0.25)
-    plt.clf()
-    x += 1"""
-
-    #peaks, info = find_peaks(yf, height=0, threshold=600, distance=4)
-    """
-    for i in range(len(xf)):
-        if xf[i] < 0:
-            
-    """
-    """plt.plot(yf)
-    plt.plot(peaks, yf[peaks], "x")
-    plt.savefig(f"plot{x}")
-    plt.clf()"""
-    
-    #print(xf[peaks])
-    #print("Y: ", yf[peaks])
-
-    """
-    for p in peaks:
-        if (xf[p] > 400 and xf[p] < 3600):
-            print(xf[p], abs(yf[p]))"""
-   #print("\n\n")
-
-    """if (abs(FREQ0-abs(xf[np.argmax(yf)])) < 500):
-        l.append(0)"""
-
+    # determine the dominant frequency
     dominant_freq = xf[np.argmax(np.abs(yf))]
-    #print(dominant_freq)
 
-    if (abs(FREQ1-dominant_freq) < 50):
+    # determine if the frequency is 0 or 1
+    if (abs(FREQ1 - dominant_freq) < 50):
         dirty_bin.append(1)
-    elif (abs(FREQ0-dominant_freq) < 50):
+    elif (abs(FREQ0 - dominant_freq) < 50):
         dirty_bin.append(0)
     else:
         dirty_bin.append(-1)
 
-#print(dirty_bin)
-
-ciphertext = ""
-
+# trim array at the front
 for bit in range(len(dirty_bin)):
     if dirty_bin[bit] != -1:
-        print("Trimming")
-        dirty_bin = dirty_bin[bit+1:]
+        dirty_bin = dirty_bin[bit + 1 :]
         break
 
+ciphertext = "" # raw ciphertext
+
+# add to ciphertext
 for k in range(0, len(dirty_bin), REL_FREQ):
-    if int(round(sum(dirty_bin[k:k+REL_FREQ])/REL_FREQ, 0)) == -1:
+    if int(round(sum(dirty_bin[k : k + REL_FREQ]) / REL_FREQ, 0)) == -1:
         break
-    mid_chunk = dirty_bin[int(round(k+(REL_FREQ/4))):int(round(k+(3*REL_FREQ/4)))]
+    
+    mid_chunk = dirty_bin[int(round(k + (REL_FREQ / 4))):int(round(k + (3 * REL_FREQ / 4)))]
+
     if len(mid_chunk) == 0:
         break
-    ciphertext += str(int(round(sum(mid_chunk)/(len(mid_chunk)), 0)))
+    
+    ciphertext += str(int(round(sum(mid_chunk) / (len(mid_chunk)), 0))) # append to ciphertext
 
-
-
-ciphertext += ((32-len(ciphertext)) % 32) * '0'
+# convert ciphertext
+ciphertext += ((32 - len(ciphertext)) % 32) * '0'
 ciphertext = np.fromstring(ciphertext, dtype=np.ubyte) - 48
-"""ciphertext[12] = ciphertext[12] ^ 1
-ciphertext[55] = ciphertext[55] ^ 1
-ciphertext[70] = ciphertext[55] ^ 1"""
+
+# account for hamming
 decoded = ""
-remove = [2**i for i in range(5)]
+remove = [2 ** i for i in range(5)]
 remove.append(0)
-#print(remove)
+
+# iterate through ciphertext
 for i in range(0, len(ciphertext), 32):
-    print(ciphertext[i:i+32])
-    bits = [i for i, bit in enumerate(ciphertext[i:i+32]) if bit]
+    bits = [i for i, bit in enumerate(ciphertext[i : i + 32]) if bit]
     if not bits:
         continue
     index = (reduce(op.xor, bits))
     
-    ciphertext[i+index] = ciphertext[i+index] ^ 1
-    decoded += "".join([",".join(item) for item in np.delete(ciphertext[i:i+32], remove).astype(str)])
+    ciphertext[i + index] = ciphertext[i + index] ^ 1
+    decoded += "".join([",".join(item) for item in np.delete(ciphertext[i : i + 32], remove).astype(str)])
     
-
+# get actual ciphertext
 ciphertext = decoded
-print(ciphertext)
-#print(ciphertext)
 
-
+# affine cipher keys
 key1inv = 183
 key2 = 193
 
-# Search for NULL and trim binary
-msg_started = False
+# initialize message variable
 m = ""
 
+# search for start of message (null)
 for i in range(len(ciphertext)):
-    if ciphertext[i:i+8] == NULL_BYTE and not msg_started:
-        ciphertext = ciphertext[i+8:]
-        msg_started = True
+    if ciphertext[i : i + 8] == NULL_BYTE:
+        ciphertext = ciphertext[i + 8 :]
         print("Start found")
         break
 
+# iterate through message until the null is reached
 for j in range(0, len(ciphertext), 8):
-    char = ciphertext[j:j+8]
-    #print(char)
-    """if len(char) < 8:
-        char += (8 - len(char)) * "1"""
+    char = ciphertext[j : j + 8]
     if char == NULL_BYTE:
-        print("End found")
         break
     else:
-        #print("Char:", chr((key1inv * (int(char, 2) - key2)) % 256), char)
+        # decode ciphertext with affine cipher
         m += chr((key1inv * (int(char, 2) - key2)) % 256)
-#os.system("clear")
+
+# print message
 print("Message: " + m)
+
+# os.remove("./input.wav")
