@@ -141,9 +141,23 @@ for i in range(0, len(ciphertext), 32):
 # get actual ciphertext
 ciphertext = decoded
 
-# affine cipher keys
-key1inv = 183
-key2 = 193
+# TODO: dipswitch
+d = "1111111111"
+
+# dipswitch values
+index1 = 0
+index2 = 0
+
+# get dipswitch values
+for i in range(5):
+    if (d[i] == "1"):
+        index1 += 2 ** i
+    if (d[i + 5] == "1"):
+        index2 += 2 ** i
+
+# get affine cipher keys
+key1inv = 65 if index2 % 2 == 0 else 161
+key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
 # initialize message variable
 m = ""
@@ -152,7 +166,6 @@ m = ""
 for i in range(len(ciphertext)):
     if ciphertext[i : i + 8] == NULL_BYTE:
         ciphertext = ciphertext[i + 8 :]
-        print("Start found")
         break
 
 # iterate through message until the null is reached

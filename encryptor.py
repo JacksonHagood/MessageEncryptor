@@ -73,9 +73,23 @@ high[-100 : -1] = 0
 low[-100 : -1] = 0
 space = np.zeros(500)
 
-# affine cipher keys
-key1 = 7
-key2 = 193
+# TODO: dipswitch
+d = "1111111111"
+
+# dipswitch values
+index1 = 0
+index2 = 0
+
+# get dipswitch values
+for i in range(5):
+    if (d[i] == "1"):
+        index1 += 2 ** i
+    if (d[i + 5] == "1"):
+        index2 += 2 ** i
+
+# get affine cipher keys
+key1 = 193 if index2 % 2 == 0 else 97
+key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
 # accept message from user input
 m = input("Enter the message: ")
@@ -99,7 +113,7 @@ binary += "11000001" # end with null
 bit_arr = np.fromstring(binary, dtype = np.ubyte) - 48
 
 # get hamming foundation
-binary_arr = get_hamming(bit_arr[:D_BITS], D_BITS, P_BITS)
+binary_arr = get_hamming(bit_arr[: D_BITS], D_BITS, P_BITS)
 
 # get new array with hamming
 for i in range(26, len(bit_arr), D_BITS):
