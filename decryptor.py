@@ -11,6 +11,10 @@ import operator as op
 import wave
 import signal
 import os
+import board
+import digitalio
+import adafruit_character_lcd.character_lcd as characterlcd
+from time import sleep
 
 cont = True # boolean for signal handling
 
@@ -162,5 +166,29 @@ for j in range(0, len(ciphertext), 8):
 
 # print message
 print("Message: " + m)
+
+# setup LCD
+lcd_columns = 16
+lcd_rows = 2
+lcd_rs = digitalio.DigitalInOut(board.D22)
+lcd_en = digitalio.DigitalInOut(board.D17)
+lcd_d4 = digitalio.DigitalInOut(board.D25)
+lcd_d5 = digitalio.DigitalInOut(board.D24)
+lcd_d6 = digitalio.DigitalInOut(board.D23)
+lcd_d7 = digitalio.DigitalInOut(board.D18)
+lcd = characterlcd.Character_LCD_Mono(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7, lcd_columns, lcd_rows)
+lcd.clear()
+
+# setup
+i = 0
+m += " "
+
+while True:
+    # display message, moving to the right
+    lcd.message = m[i:i + 16]
+    if len(m) < 18:
+        break
+    i = (i + 1) % len(m)
+    sleep(0.25)
 
 # os.remove("./input.wav")
