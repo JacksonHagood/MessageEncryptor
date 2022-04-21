@@ -20,7 +20,6 @@ import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(24, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
 #bool to switch modes
-encrypting = False
 # setup LCD
 lcd_columns = 16
 lcd_rows = 2
@@ -354,13 +353,14 @@ def encryptor():
     os.remove(wav_file)
     return
 def program(channel):
-    encrypting = not encrypting
+    encrypting = True
     while True:
         lcd.clear()
+        GPIO.add_event_detext(24, GPIO.RISING, encrypting = not encrypting)
         if encrypting:
             encryptor()
         else:  
             decryptor()
 #interrupt run program first
-GPIO.add_event_detext(24, GPIO.RISING, callback = program)
-# program()
+# GPIO.add_event_detext(24, GPIO.RISING, callback = program)
+program()
