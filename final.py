@@ -17,6 +17,13 @@ import board
 import digitalio
 import adafruit_character_lcd.character_lcd as characterlcd
 from time import sleep
+import RPi.GPIO as GPIO
+
+# button setup
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(12, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+GPIO.setup(5, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+GPIO.setup(6, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
 
 # setup LCD
 lcd_columns = 16
@@ -28,16 +35,18 @@ lcd_d5 = digitalio.DigitalInOut(board.D24)
 lcd_d6 = digitalio.DigitalInOut(board.D23)
 lcd_d7 = digitalio.DigitalInOut(board.D18)
 lcd = characterlcd.Character_LCD_Mono(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7, lcd_columns, lcd_rows)
+lcd.clear()
 
 cont = True # boolean for signal handling
 
 # signal handler for stopping recording
-def sigint_handler(signal, frame):
+def button_handler(channel):
         print("Stopping...")
         global cont
         cont = False
 
-signal.signal(signal.SIGINT, sigint_handler) # signal setup
+# signal.signal(signal.SIGINT, button_handler) # signal setup
+GPIO.add_event_detect(12, GPIO.RISING, callback = button_handler)
 
 def encryptor():
     global lcd
@@ -111,23 +120,30 @@ def encryptor():
     high[-100 : -1] = 0
     low[-100 : -1] = 0
     space = np.zeros(500)
+    
+    # spi = busio.SPI(clock=board.SCK, MISO=board.MISO, MOSI=board.MOSI)
+	# cs = digitalio.DigitalInOut(board.D16)
+	# mcp = MCP.MCP3008(spi, cs)
+	# chan0 = AnalogIn(mcp, MCP.P0)
+
+	# read_in = 8 * [chan0.value]
 
     # TODO: dipswitch
-    d = "1111111111"
+    d = "111111"
 
     # dipswitch values
-    index1 = 0
-    index2 = 0
+    index1 = 0 # first 5 bits
+    index2 = 0 # last (6th) bit
 
     # get dipswitch values
-    for i in range(5):
-        if (d[i] == "1"):
+    for i in range(6):
+        if i < 5 and d[i] == "1":
             index1 += 2 ** i
-        if (d[i + 5] == "1"):
-            index2 += 2 ** i
+        elif i == 5 and d[i] == "1":
+            index2 = 1
 
     # get affine cipher keys
-    key1 = 193 if index2 % 2 == 0 else 97
+    key1 = 193 if index2 == 1 else 97
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
     # accept message from user input
@@ -175,8 +191,13 @@ def encryptor():
 
     # wait for keystroke
     lcd.clear()
-    lcd.message = "Press enter"
-    input("Press <Enter> to play message")
+    lcd.message = "Press B1"
+    
+    while True:
+        if GPIO.input(5) == GPIO.HIGH:
+            break
+    
+    # input("Press <Enter> to play message")
 
     # play wav file
     lcd.clear()
@@ -204,16 +225,24 @@ def decryptor():
 
     # wait for keystroke
     lcd.clear()
-    lcd.message = "Press enter"
-    input("Press <Enter> to start recording...")
+    lcd.message = "Press B1"
+    
+    while True:
+        if GPIO.input(5) == GPIO.HIGH:
+            break
+    
+    lcd.message = "Recording"
     print("* recording")
 
     # read sound signal
+    global cont
+    cont = True
     while cont:
         data = stream.read(chunk)
         frames.append(data)
 
     # stop recording
+    lcd.message = "Done"
     print("* done recording")
 
     # close reader
@@ -308,21 +337,21 @@ def decryptor():
     ciphertext = decoded
 
     # TODO: dipswitch
-    d = "1111111111"
+    d = "111111"
 
     # dipswitch values
-    index1 = 0
-    index2 = 0
+    index1 = 0 # first 5 bits
+    index2 = 0 # last (6th) bit
 
     # get dipswitch values
-    for i in range(5):
-        if (d[i] == "1"):
+    for i in range(6):
+        if i < 5 and d[i] == "1":
             index1 += 2 ** i
-        if (d[i + 5] == "1"):
-            index2 += 2 ** i
+        elif i == 5 and d[i] == "1":
+            index2 = 1
 
     # get affine cipher keys
-    key1inv = 65 if index2 % 2 == 0 else 161
+    key1inv = 65 if index2 == 1 else 161
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
     # initialize message variable
@@ -353,18 +382,25 @@ def decryptor():
 
     while True:
         # display message, moving to the right
-        lcd.message = m[i:i + 16]
-        if len(m) < 18:
+        if GPIO.input(5) == GPIO.HIGH:
             break
+        
+        lcd.message = m[i:i + 16]
+        
+        if len(m) < 18:
+            continue
+        
         i = (i + 1) % len(m)
         sleep(0.25)
 
     # os.remove("./input.wav")
 
 while True:
-    i = input("Select Encryptor (1) / Decryptor (2): ")
-
-    if i == '1':
+    sleep (0.1)
+    lcd.message = "Select Mode"
+    
+    
+    if GPIO.input(5) == GPIO.HIGH:
         encryptor()
-    else:
+    elif GPIO.input(6) == GPIO.HIGH:
         decryptor()
