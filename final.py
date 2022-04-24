@@ -120,15 +120,8 @@ def encryptor():
     high[-100 : -1] = 0
     low[-100 : -1] = 0
     space = np.zeros(500)
-    
-    # spi = busio.SPI(clock=board.SCK, MISO=board.MISO, MOSI=board.MOSI)
-	# cs = digitalio.DigitalInOut(board.D16)
-	# mcp = MCP.MCP3008(spi, cs)
-	# chan0 = AnalogIn(mcp, MCP.P0)
 
-	# read_in = 8 * [chan0.value]
-
-    # TODO: dipswitch
+    # set dipswitch value manually (another version would implement determining the keys with a dipswitch)
     d = "111111"
 
     # dipswitch values
@@ -336,7 +329,7 @@ def decryptor():
     # get actual ciphertext9
     ciphertext = decoded
 
-    # TODO: dipswitch
+    # set dipswitch value manually (another version would implement determining the keys with a dipswitch)
     d = "111111"
 
     # dipswitch values
