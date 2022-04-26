@@ -1,7 +1,7 @@
 # imports
 from scipy.io import wavfile
 import numpy as np
-import os
+import os, sys
 from pickle import NONE
 import numpy as np
 import pyaudio
@@ -15,13 +15,15 @@ import signal
 import os
 import board
 import digitalio
+import warnings
 from time import sleep
+
+warnings.filterwarnings("ignore")
 
 cont = True # boolean for signal handling
 
 # signal handler for stopping recording
 def sigint_handler(signal, frame):
-        print("Stopping...")
         global cont
         cont = False
 
@@ -117,7 +119,7 @@ def encryptor():
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
     # accept message from user input
-    m = input("Enter the message: ")
+    m = input("\tEnter the message: ")
     c = []
     binary = ""
 
@@ -159,16 +161,23 @@ def encryptor():
     wavfile.write("output.wav", samplerate, array.astype(np.int16))
 
     # wait for keystroke
-    input("Press enter to play message")
+    input("\tPress <Enter> to play message")
 
     # play wav file
-    print("Playing message")
+    print("\tPlaying message\n\t", end = "")
     wav_file = "./output.wav"
     os.system(f'aplay {wav_file}')
 
     # os.remove(wav_file)
 
 def decryptor():
+    # suppress ALSA warnings
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    old_stderr = os.dup(2)
+    sys.stderr.flush()
+    os.dup2(devnull, 2)
+    os.close(devnull)
+
     # wav file variables
     chunk = 1000
     rate = 44100
@@ -180,10 +189,12 @@ def decryptor():
     # setup audio listener
     p = pyaudio.PyAudio()
     stream = p.open(format = form, channels = channels, rate = rate, input = True, frames_per_buffer = chunk)
-
+    
     # wait for keystroke
-    input("Press enter to start recording...")
-    print("* recording")
+    os.dup2(old_stderr, 2)
+    os.close(old_stderr)
+    input("\tPress <Enter> to start recording...")
+    print("\t* recording")
 
     # read sound signal
     while cont:
@@ -191,7 +202,7 @@ def decryptor():
         frames.append(data)
 
     # stop recording
-    print("* done recording")
+    print("\t* done recording")
 
     # close reader
     stream.stop_stream()
@@ -321,18 +332,13 @@ def decryptor():
             m += chr((key1inv * (int(char, 2) - key2)) % 256)
 
     # print message
-    print("Message: " + m)
-
-    # setup
-    i = 0
-    m += " "
-
-    print("Message:", m)
+    print("\tMessage: " + m)
 
     # os.remove("./input.wav")
 
 while True:
-    i = input("Select Encryptor (1) / Decryptor (2): ")
+    i = input("\nSelect Encryptor (1) / Decryptor (2): ")
+    print()
 
     if i == '1':
         encryptor()
