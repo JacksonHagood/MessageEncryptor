@@ -104,22 +104,13 @@ def encryptor():
     low[-100 : -1] = 0
     space = np.zeros(500)
 
-    # TODO: dipswitch
-    d = "1111111111"
-
-    # dipswitch values
-    index1 = 0
-    index2 = 0
-
-    # get dipswitch values
-    for i in range(5):
-        if (d[i] == "1"):
-            index1 += 2 ** i
-        if (d[i + 5] == "1"):
-            index2 += 2 ** i
+    # get indexes for key selection from DIP switch
+    dip = get_dip_input()
+    index1 = dip % 2 # first 5 bits
+    index2 = int(dip / 2) # last (6th) bit
 
     # get affine cipher keys
-    key1 = 193 if index2 % 2 == 0 else 97
+    key1 = 193 if index2 == 1 else 97
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
 
     # accept message from user input
@@ -131,14 +122,14 @@ def encryptor():
     for char in m:
         c.append((key1 * ord(char) + key2) % 256)
 
-    binary += "11000001" # start with null
+    binary += encrypt_char('\0', key1, key2) # start with null
 
     # convert message to binary
     for char in c:
         temp = bin(char)[2:]
         binary += '0' * (8 - len(temp)) + temp
 
-    binary += "11000001" # end with null
+    binary += encrypt_char('\0', key1, key2) # end with null
 
     # get bit array
     bit_arr = np.fromstring(binary, dtype = np.ubyte) - 48
@@ -223,7 +214,6 @@ def decryptor():
     REL_FREQ = 4
     FREQ0 = 1000 # tone 0
     FREQ1 = 2000 # tone 1
-    NULL_BYTE = "11000001"
 
     # open wav file
     freq_sample, sig_audio = wavfile.read("./input.wav")
@@ -297,23 +287,16 @@ def decryptor():
     # get actual ciphertext9
     ciphertext = decoded
 
-    # TODO: dipswitch
-    d = "1111111111"
-
-    # dipswitch values
-    index1 = 0
-    index2 = 0
-
-    # get dipswitch values
-    for i in range(5):
-        if (d[i] == "1"):
-            index1 += 2 ** i
-        if (d[i + 5] == "1"):
-            index2 += 2 ** i
+    # get indexes for key selection from DIP switch
+    dip = get_dip_input()
+    index1 = dip % 2 # first 5 bits
+    index2 = int(dip / 2) # last (6th) bit
 
     # get affine cipher keys
-    key1inv = 65 if index2 % 2 == 0 else 161
+    key1 = 193 if index2 == 1 else 97
+    key1inv = 65 if index2 == 1 else 161
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
+    NULL_BYTE = encrypt_char('\0', key1, key2)
 
     # initialize message variable
     m = ""
