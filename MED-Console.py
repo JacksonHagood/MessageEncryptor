@@ -28,6 +28,20 @@ warnings.filterwarnings("ignore")
 
 cont = True # boolean for signal handling
 
+# function to take value of DIP switch
+def get_dip_input():
+    # hardcoded
+    return 111111
+
+# function to encrypt a character
+def encrypt_char(char, key1, key2):
+    ciphertext = (key1 * ord(char) + key2) % 256
+    char = ""
+    temp = bin(ciphertext)[2:]
+    char += '0' * (8 - len(temp)) + temp
+    print(char)
+    return char
+
 # signal handler for stopping recording
 def sigint_handler(signal, frame):
         global cont
