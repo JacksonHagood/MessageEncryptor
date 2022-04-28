@@ -1,38 +1,28 @@
-# Message Encryptor and Decryptor
-# Works with button and keyboard input and LCD output
-# CSCE 462: Sections 501 and 502 (Spring 2022, Team 8)
-# Jackson Hagood (hagoojac@tamu.edu),
-# Andrew Imwalle (andrew.imwalle@tamu.edu),
-# and Max Smith (maxsmith271346@tamu.edu)
-
 # imports
-import adafruit_character_lcd.character_lcd as characterlcd
-import adafruit_mcp3xxx.mcp3008 as MCP
-import board
-import busio
-import digitalio
-import numpy as np
-import operator as op
-import os, sys
-import pyaudio
-import RPi.GPIO as GPIO
-import scipy.fftpack as fft
-import signal
-import warnings
-import wave
-from adafruit_mcp3xxx.analog_in import AnalogIn
-from functools import reduce
-from pickle import NONE
-from scipy.interpolate import interp1d
 from scipy.io import wavfile
+import numpy as np
+import os
+from pickle import NONE
+import numpy as np
+import pyaudio
+import scipy.fftpack as fft
 from scipy.signal import find_peaks
 from textwrap import wrap
+from functools import reduce
+import operator as op
+import wave
+import signal
+import board
+import digitalio
+import adafruit_character_lcd.character_lcd as characterlcd
 from time import sleep
-
-# suppress warnings
-warnings.filterwarnings("ignore")
-
-# setup for DIP input
+import RPi.GPIO as GPIO
+import busio
+import adafruit_mcp3xxx.mcp3008 as MCP
+from adafruit_mcp3xxx.analog_in import AnalogIn
+from scipy.interpolate import interp1d
+  
+# setup for DIP input through mcp3008
 spi = busio.SPI(clock=board.SCK, MISO=board.MISO, MOSI=board.MOSI)
 cs = digitalio.DigitalInOut(board.D22)
 mcp = MCP.MCP3008(spi, cs)
@@ -42,28 +32,31 @@ chan0 = AnalogIn(mcp, MCP.P0)
 chan_vals = [64512, 63288.32, 62241.92, 61121.92, 60181.76, 59050.24, 58018.56, 56895.36, 56050.56, 54929.92, 53889.28, 52775.04, 51841.28, 50720.0, 49713.92, 48598.4, 47981.44, 46864.64, 45843.84, 44739.84, 43781.12, 42673.28, 41668.48, 40576.64, 39689.6, 38590.08, 37569.28, 36505.6, 35536.64, 34457.6, 33456.0, 32377.6, 31500.8, 30418.56, 29394.56, 28333.44, 27346.56, 26280.96, 25267.84, 24200.32, 23240.96, 22187.52, 21178.88, 20136.32, 19142.4, 18104.96, 17082.88, 16058.88, 15290.88, 14229.76, 13208.96, 12176.0, 11182.08, 10144.0, 9144.32, 8120.32, 7116.16, 6090.24, 5079.68, 4078.08, 3070.72, 2046.72, 1037.44, 0]
 nums = [i for i in range(64)]
 
-# function to take value of DIP switch
+# performs linear interpolation over chan_vals
+# and maps mcp3008 input to an integer value
 def get_dip_input():
-    # linear interpolation over chan_vals
-    # maps mcp3008 input to an integer value
-    lcd.message = "Set keys on DIP"
-    sleep(5)
-    num_interp = interp1d(chan_vals, nums)
-    sum = 0
-    for i in range(100):
-        sum = sum + chan0.value
-        sleep(0.001)
-    avg = sum / 100
-    num = int(np.around(num_interp(avg)))
-    return num
-
-# function to encrypt a character
+  lcd.clear()
+  lcd.message = "Set keys on DIP"
+  #wait 5 seconds for user input, then get and return value
+  sleep(5)
+  num_interp = interp1d(chan_vals, nums)
+  sum = 0
+  for i in range(100):
+    sum = sum + chan0.value
+    sleep(0.001)
+  avg = sum / 100
+  num = int(np.around(num_interp(avg)))
+  print("num: ", num)
+  return num
+  
+# encrypts a single character based on the provided keys
 def encrypt_char(char, key1, key2):
-    ciphertext = (key1 * ord(char) + key2) % 256
-    char = ""
-    temp = bin(ciphertext)[2:]
-    char += '0' * (8 - len(temp)) + temp
-    return char
+  ciphertext = (key1 * ord(char) + key2) % 256
+  char = ""
+  temp = bin(ciphertext)[2:]
+  char += '0' * (8 - len(temp)) + temp
+  print(char)
+  return char
 
 # button setup
 GPIO.setmode(GPIO.BCM)
@@ -87,17 +80,22 @@ cont = True # boolean for signal handling
 
 # signal handler for stopping recording
 def button_handler(channel):
+        print("Stopping...")
         global cont
         cont = False
 
-# signal.signal(signal.SIGINT, button_handler) # signal setup
+# setup event handler for button interrupt
 GPIO.add_event_detect(21, GPIO.RISING, callback = button_handler)
 
 def encryptor():
     global lcd
 
-    # hamming functionality
+    # encode data with Hamming(32, 26) 
+    # (this is really (31, 26); the sixth parity bit was included without adding
+    # functionality for 2-bit error detection just to round out packet size to an even 4 bytes)
     def get_hamming(data, d_bits, p_bits):
+        # print(len(data))
+
         # ensure data is the correct size
         if len(data) != d_bits:
             data = np.append(data, np.zeros(d_bits - len(data)))
@@ -115,13 +113,13 @@ def encryptor():
                 p_place *= 2
             
             else:
-                # set data bit and increment index
+                # Determine parity bits
                 data_bit = data[data_index]
                 encoded[i] = data_bit
                 data_index += 1
                 parity_bits[0] += data_bit
                 
-                # allow for variable number of parity bits
+                
                 if int(i % 2) == 1:
                     parity_bits[1] += data_bit
                 if int((i % 4) / 2) == 1:
@@ -133,7 +131,7 @@ def encryptor():
                 if int((i % 32) / 16) == 1:
                     parity_bits[5] += data_bit
 
-        # iterate through parity bits
+        # set parity bits in encoded binary
         for i in range(1, p_bits + 1):
             if parity_bits[i] % 2 == 1:
                 encoded[(2 ** (i - 1))] = 1
@@ -164,15 +162,24 @@ def encryptor():
     low[-100 : -1] = 0
     space = np.zeros(500)
 
-    # get indexes for key selection from DIP switch
+
+    # get dip switch value
     dip = get_dip_input()
+
+    # strip key indices from dip input
     index1 = dip % 2 # first 5 bits
     index2 = int(dip / 2) # last (6th) bit
 
     # get affine cipher keys
     key1 = 193 if index2 == 1 else 97
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
-
+    """
+    lcd.message = f'{dip} {index2}'
+    sleep(3)
+    lcd.message = f'Key1={key1} Key2={key2}'
+    sleep(5)
+    lcd.clear()
+    """
     # accept message from user input
     lcd.clear()
     lcd.message = "Enter message"
@@ -185,7 +192,7 @@ def encryptor():
         c.append((key1 * ord(char) + key2) % 256)
 
     binary += encrypt_char('\0', key1, key2) # start with null
-
+    
     # convert message to binary
     for char in c:
         temp = bin(char)[2:]
@@ -217,33 +224,25 @@ def encryptor():
     # write to wav file
     wavfile.write("output.wav", samplerate, array.astype(np.int16))
 
-    # wait for keystroke
-    lcd.clear()
-    lcd.message = "Press B1"
-    
     # wait for button press
+    lcd.clear()
+    lcd.message = "Press B1\nTo Play"
+    
     while True:
         if GPIO.input(16) == GPIO.HIGH:
             break
-
+ 
     # play wav file
     lcd.clear()
     lcd.message = "Playing message"
     wav_file = "./output.wav"
     os.system(f'aplay {wav_file}')
 
-    # clear LCD
     lcd.clear()
+    # os.remove(wav_file)
 
 def decryptor():
     global lcd
-
-    # suppress ALSA warnings
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    old_stderr = os.dup(2)
-    sys.stderr.flush()
-    os.dup2(devnull, 2)
-    os.close(devnull)
 
     # wav file variables
     chunk = 1000
@@ -253,22 +252,30 @@ def decryptor():
     form = pyaudio.paInt16
     frames = []
 
-    # setup audio listener
-    p = pyaudio.PyAudio()
-    stream = p.open(format = form, channels = channels, rate = rate, input = True, frames_per_buffer = chunk)
+    #get dip switch values
+    dip = get_dip_input()
 
-    # wait for B1
-    os.dup2(old_stderr, 2)
-    os.close(old_stderr)
+    # wait for keystroke
     lcd.clear()
-    lcd.message = "Press B1"
+    lcd.message = "Press B1\nTo Record"
     
     while True:
         if GPIO.input(16) == GPIO.HIGH:
             break
+
+
+     # setup audio listener       
+    lcd.clear()
+    lcd.message = "Loading\nMicrophone..."
+    print("Loading Microphone...")
     
-    # start recording
-    lcd.message = "Recording"
+    p = pyaudio.PyAudio()
+    stream = p.open(format = form, channels = channels, rate = rate, input = True, frames_per_buffer = chunk)
+    
+    
+    lcd.clear()
+    lcd.message = "Recording\n(B3 to stop)"
+    print("* recording")
 
     # read sound signal
     global cont
@@ -277,8 +284,10 @@ def decryptor():
         data = stream.read(chunk)
         frames.append(data)
 
-    # stop recording
+    # stop recording (will stop on button interrupt)
+    lcd.clear()
     lcd.message = "Done"
+    print("* done recording")
 
     # close reader
     stream.stop_stream()
@@ -297,21 +306,21 @@ def decryptor():
     REL_FREQ = 4
     FREQ0 = 1000 # tone 0
     FREQ1 = 2000 # tone 1
+    
 
     # open wav file
     freq_sample, sig_audio = wavfile.read("./input.wav")
 
     if sig_audio.ndim > 1:
-        sig_audio = sig_audio[:, 0]
+            sig_audio = sig_audio[:, 0]
 
     # get duration
     duration = int(freq_sample / (REL_FREQ * 12))
 
     # list to store binary value over window
     dirty_bin = []
-    x = 0
 
-    # iterate through signal
+    # iterate through signal to get frequency information
     for i in range(0, len(sig_audio), duration):
         # get y and x
         yf = fft.rfft(sig_audio[i : i + duration])
@@ -320,7 +329,7 @@ def decryptor():
         # determine the dominant frequency
         dominant_freq = xf[np.argmax(np.abs(yf))]
 
-        # determine if the frequency is 0 or 1
+        # determine if the frequency is 0 or 1 (or noise)
         if (abs(FREQ1 - dominant_freq) < 50):
             dirty_bin.append(1)
         elif (abs(FREQ0 - dominant_freq) < 50):
@@ -334,9 +343,9 @@ def decryptor():
             dirty_bin = dirty_bin[bit + 1 :]
             break
 
-    ciphertext = "" # raw ciphertext
+    ciphertext = "" # raw ciphertext bit string
 
-    # add to ciphertext
+    # Noise removal by averaging determined value over window
     for k in range(0, len(dirty_bin), REL_FREQ):
         if int(round(sum(dirty_bin[k : k + REL_FREQ]) / REL_FREQ, 0)) == -1:
             break
@@ -352,12 +361,13 @@ def decryptor():
     ciphertext += ((32 - len(ciphertext)) % 32) * '0'
     ciphertext = np.fromstring(ciphertext, dtype=np.ubyte) - 48
 
-    # account for hamming
+    # initialize variables for hamming decoding
     decoded = ""
     remove = [2 ** i for i in range(5)]
     remove.append(0)
 
-    # iterate through ciphertext
+    # iterate through ciphertext to decode hamming
+    # this will correct any 1-bit errors that occur within a packet)
     for i in range(0, len(ciphertext), 32):
         bits = [i for i, bit in enumerate(ciphertext[i : i + 32]) if bit]
         if not bits:
@@ -367,23 +377,24 @@ def decryptor():
         ciphertext[i + index] = ciphertext[i + index] ^ 1
         decoded += "".join([",".join(item) for item in np.delete(ciphertext[i : i + 32], remove).astype(str)])
         
-    # get actual ciphertext9
+    # set ciphertext to the decoded/error-corrected bit string
     ciphertext = decoded
 
-    # get indexes for key selection from DIP switch
-    dip = get_dip_input()
+    # strip key indices from dip input
     index1 = dip % 2 # first 5 bits
     index2 = int(dip / 2) # last (6th) bit
-
+    
     # get affine cipher keys
     key1 = 193 if index2 == 1 else 97
     key1inv = 65 if index2 == 1 else 161
     key2 = [177, 10, 186, 162, 46, 197, 21, 133, 109, 137, 115, 90, 65, 145, 216, 154, 196, 53, 19, 152, 220, 28, 108, 198, 234, 16, 50, 143, 117, 12, 48, 239][index1]
+    
+    # null byte constant is encrypted null character binary string
     NULL_BYTE = encrypt_char('\0', key1, key2)
 
     # initialize message variable
     m = ""
-
+    print(ciphertext)
     # search for start of message (null)
     for i in range(len(ciphertext)):
         if ciphertext[i : i + 8] == NULL_BYTE:
@@ -399,17 +410,20 @@ def decryptor():
             # decode ciphertext with affine cipher
             m += chr((key1inv * (int(char, 2) - key2)) % 256)
 
-    # setup LCD for message
+    # print message
+    print("Message: " + m)
+    lcd.clear()
+    
+    # setup
     i = 0
     m += " "
-    lcd.clear()
 
     while True:
         # display message, moving to the right
         if GPIO.input(16) == GPIO.HIGH:
             break
         
-        lcd.message = m[i:i + 16]
+        lcd.message = m[i:i + 16] + "\n(B1 to exit)"
         
         if len(m) < 18:
             continue
@@ -417,9 +431,11 @@ def decryptor():
         i = (i + 1) % len(m)
         sleep(0.25)
 
+# starting state which allows user selection of mode
 while True:
     sleep (0.1)
-    lcd.message = "Select Mode"
+    lcd.message = "Select Mode\nEnc: B1, Dec: B2"
+    
     
     if GPIO.input(16) == GPIO.HIGH:
         encryptor()
