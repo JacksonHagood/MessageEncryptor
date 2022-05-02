@@ -1,27 +1,30 @@
+# message encryptor and decryptor
+# Jackson Hagood, Andrew Imwalle, and Max Smith
+
 # imports
-from scipy.io import wavfile
-import numpy as np
-import os
-from pickle import NONE
-import numpy as np
-import pyaudio
-import scipy.fftpack as fft
-from scipy.signal import find_peaks
-from textwrap import wrap
-from functools import reduce
-import operator as op
-import wave
-import signal
-import board
-import digitalio
 import adafruit_character_lcd.character_lcd as characterlcd
-from time import sleep
-import RPi.GPIO as GPIO
-import busio
 import adafruit_mcp3xxx.mcp3008 as MCP
+import board
+import busio
+import digitalio
+import numpy as np
+import operator as op
+import os
+import pyaudio
+import RPi.GPIO as GPIO
+import scipy.fftpack as fft
+import signal
+import wave
 from adafruit_mcp3xxx.analog_in import AnalogIn
+from functools import reduce
 from scipy.interpolate import interp1d
-  
+from scipy.io import wavfile
+from scipy.signal import find_peaks
+from time import sleep
+
+# suppress warnings
+warnings.filterwarnings("ignore")
+
 # setup for DIP input through mcp3008
 spi = busio.SPI(clock=board.SCK, MISO=board.MISO, MOSI=board.MOSI)
 cs = digitalio.DigitalInOut(board.D22)
@@ -32,31 +35,30 @@ chan0 = AnalogIn(mcp, MCP.P0)
 chan_vals = [64512, 63288.32, 62241.92, 61121.92, 60181.76, 59050.24, 58018.56, 56895.36, 56050.56, 54929.92, 53889.28, 52775.04, 51841.28, 50720.0, 49713.92, 48598.4, 47981.44, 46864.64, 45843.84, 44739.84, 43781.12, 42673.28, 41668.48, 40576.64, 39689.6, 38590.08, 37569.28, 36505.6, 35536.64, 34457.6, 33456.0, 32377.6, 31500.8, 30418.56, 29394.56, 28333.44, 27346.56, 26280.96, 25267.84, 24200.32, 23240.96, 22187.52, 21178.88, 20136.32, 19142.4, 18104.96, 17082.88, 16058.88, 15290.88, 14229.76, 13208.96, 12176.0, 11182.08, 10144.0, 9144.32, 8120.32, 7116.16, 6090.24, 5079.68, 4078.08, 3070.72, 2046.72, 1037.44, 0]
 nums = [i for i in range(64)]
 
-# performs linear interpolation over chan_vals
-# and maps mcp3008 input to an integer value
+# performs linear interpolation over chan_vals and maps mcp3008 input to an integer value
 def get_dip_input():
-  lcd.clear()
-  lcd.message = "Set keys on DIP"
-  #wait 5 seconds for user input, then get and return value
-  sleep(5)
-  num_interp = interp1d(chan_vals, nums)
-  sum = 0
-  for i in range(100):
-    sum = sum + chan0.value
-    sleep(0.001)
-  avg = sum / 100
-  num = int(np.around(num_interp(avg)))
-  print("num: ", num)
-  return num
+    lcd.clear()
+    lcd.message = "Set keys on DIP"
+    #wait 5 seconds for user input, then get and return value
+    sleep(5)
+    num_interp = interp1d(chan_vals, nums)
+    sum = 0
+    for i in range(100):
+        sum = sum + chan0.value
+        sleep(0.001)
+    avg = sum / 100
+    num = int(np.around(num_interp(avg)))
+    print("num: ", num)
+    return num
   
 # encrypts a single character based on the provided keys
 def encrypt_char(char, key1, key2):
-  ciphertext = (key1 * ord(char) + key2) % 256
-  char = ""
-  temp = bin(ciphertext)[2:]
-  char += '0' * (8 - len(temp)) + temp
-  print(char)
-  return char
+    ciphertext = (key1 * ord(char) + key2) % 256
+    char = ""
+    temp = bin(ciphertext)[2:]
+    char += '0' * (8 - len(temp)) + temp
+    print(char)
+    return char
 
 # button setup
 GPIO.setmode(GPIO.BCM)
@@ -259,20 +261,30 @@ def decryptor():
     lcd.clear()
     lcd.message = "Press B1\nTo Record"
     
+    # wait for button press
     while True:
         if GPIO.input(16) == GPIO.HIGH:
             break
+    
+    # suppress ALSA warnings
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    old_stderr = os.dup(2)
+    sys.stderr.flush()
+    os.dup2(devnull, 2)
+    os.close(devnull)
 
-
-     # setup audio listener       
+    # setup audio listener
     lcd.clear()
     lcd.message = "Loading\nMicrophone..."
     print("Loading Microphone...")
     
+    # setup recorder
     p = pyaudio.PyAudio()
     stream = p.open(format = form, channels = channels, rate = rate, input = True, frames_per_buffer = chunk)
     
-    
+    # wait for button press
+    os.dup2(old_stderr, 2)
+    os.close(old_stderr)
     lcd.clear()
     lcd.message = "Recording\n(B3 to stop)"
     print("* recording")
@@ -435,7 +447,6 @@ def decryptor():
 while True:
     sleep (0.1)
     lcd.message = "Select Mode\nEnc: B1, Dec: B2"
-    
     
     if GPIO.input(16) == GPIO.HIGH:
         encryptor()
